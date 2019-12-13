@@ -4,11 +4,12 @@ organization := "com.github.vmencik"
 
 version := "0.1"
 
-scalaVersion := "2.13.0"
+scalaVersion := "2.13.1"
 
 val akkaVersion = "2.5.25"
 val akkaHttpVersion = "10.1.8"
 val graalAkkaVersion = "0.5.0"
+val circeVersion = "0.12.1"
 
 resolvers += Resolver.sonatypeRepo("releases")
 
@@ -22,8 +23,12 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-jdk14" % "1.7.26", // java.util.logging works mostly out-of-the-box with SubstrateVM
 
   "com.github.vmencik" %% "graal-akka-http" % graalAkkaVersion,
-  "com.github.vmencik" %% "graal-akka-slf4j" % graalAkkaVersion
+  "com.github.vmencik" %% "graal-akka-slf4j" % graalAkkaVersion,
 
+  "de.heikoseeberger" %% "akka-http-circe" % "1.29.1",
+  "io.circe" %% "circe-core" % circeVersion,
+  "io.circe" %% "circe-generic" % circeVersion,
+  "io.circe" %% "circe-parser" % circeVersion
 )
 
 enablePlugins(GraalVMNativeImagePlugin)

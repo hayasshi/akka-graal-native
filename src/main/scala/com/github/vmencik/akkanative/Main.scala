@@ -15,6 +15,11 @@ import scala.util.Success
 
 object Main extends LazyLogging {
 
+  import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
+  import io.circe.generic.auto._
+
+  case class Response(size: String)
+
   def main(args: Array[String]): Unit = {
     configureLogging()
 
@@ -27,7 +32,7 @@ object Main extends LazyLogging {
       path("graal-hp-size") {
         get {
           onSuccess(graalHomepageSize) { size =>
-            complete(size.toString)
+            complete(Response(size.toString))
           }
         }
       }
