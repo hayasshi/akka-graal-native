@@ -8,5 +8,13 @@
     "name": "java.util.logging.SimpleFormatter",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true
+  },
+  {
+    "name": "org.mariadb.jdbc.Driver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.mariadb.jdbc.util.Options",
+    "allDeclaredFields": true
   }
 ]

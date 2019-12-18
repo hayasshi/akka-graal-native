@@ -1,5 +1,6 @@
 package com.github.vmencik.akkanative
 
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.util.logging.LogManager
 
 import akka.actor.ActorSystem
@@ -13,12 +14,18 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
+
+
 object Main extends LazyLogging {
 
   import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
   import io.circe.generic.auto._
 
-  case class Response(size: String)
+  case class History(size: String, created_at: String)
+  case class Response(size: String, histories: Seq[History])
+
+  import scalikejdbc._
+  ConnectionPool.singleton("jdbc:mariadb://127.0.0.1/mymysql", "mymysql", "mymysql")
 
   def main(args: Array[String]): Unit = {
     configureLogging()
@@ -31,8 +38,19 @@ object Main extends LazyLogging {
     val route =
       path("graal-hp-size") {
         get {
-          onSuccess(graalHomepageSize) { size =>
-            complete(Response(size.toString))
+          val result = graalHomepageSize.map { size =>
+            val histories = DB.localTx { implicit session =>
+              sql"SELECT * FROM access_history ORDER BY id DESC".map { rs =>
+                History(
+                  rs.long("size").toString,
+                  ZonedDateTime.ofInstant(Instant.ofEpochMilli(rs.long("created_at_epoch_millis")), ZoneId.systemDefault()).toString
+                )
+              }.list().apply()
+            }
+            (size, histories)
+          }
+          onSuccess(result) { case (size, histories) =>
+            complete(Response(size.toString, histories))
           }
         }
       }
@@ -48,19 +66,27 @@ object Main extends LazyLogging {
 
   private def graalHomepageSize(implicit ec: ExecutionContext,
                                 system: ActorSystem,
-                                mat: Materializer): Future[Int] =
-    Http().singleRequest(HttpRequest(uri = "https://www.graalvm.org")).flatMap { resp =>
-      resp.status match {
-        case StatusCodes.OK =>
-          resp.entity.dataBytes.runFold(0) { (cnt, chunk) =>
-            cnt + chunk.size
-          }
-        case other =>
-          resp.discardEntityBytes()
-          throw new IllegalStateException(s"Unexpected status code $other")
+                                mat: Materializer): Future[Int] = {
+    Http().singleRequest(HttpRequest(uri = "https://www.graalvm.org"))
+      .flatMap { resp =>
+        resp.status match {
+          case StatusCodes.OK =>
+            resp.entity.dataBytes.runFold(0) { (cnt, chunk) =>
+              cnt + chunk.size
+            }
+          case other =>
+            resp.discardEntityBytes()
+            throw new IllegalStateException(s"Unexpected status code $other")
+        }
+      }
+      .map { size =>
+        DB.localTx { implicit session =>
+          sql"INSERT INTO access_history (size, created_at_epoch_millis) values ($size, ${java.time.Instant.now().toEpochMilli})".update.apply()
+        }
+        size
       }
 
-    }
+  }
 
   private def configureLogging(): Unit = {
     val is = getClass.getResourceAsStream("/app.logging.properties")
